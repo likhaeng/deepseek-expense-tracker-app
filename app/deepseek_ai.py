@@ -1,3 +1,4 @@
+import json
 import os
 # import psycopg2
 import pyodbc
@@ -62,6 +63,31 @@ def clean_sql_response(sql_response):
 
     return sql_query, think_text, None  # SQL is clean, Think text is stored
 
+def clean_json_response(json_response):
+    # NOTE reason in JSON is not utilized yet, might need to log into log file
+    """Extract <think> section separately and ensure the SQL query is clean."""
+    
+    # Extract <think> text
+    think_match = re.search(r"<think>(.*?)</think>", json_response, flags=re.DOTALL)
+    think_text = think_match.group(1).strip() if think_match else None
+
+    # Extract JSON and SQL query inside ```json ... ```
+    json_match = re.search(r"```json(.*?)```", json_response, flags=re.DOTALL)
+    json_string = json_match.group(1).strip() if json_match else None
+    json_dict = json.loads(json_string)
+    if "response" in json_dict:
+        sql_query = json_dict["response"]
+    else:
+        sql_query = None
+
+    if "status" in json_dict:
+        if json_dict["status"] == "rejected":
+            return None, None, "I cannot process this request due to security constraints."
+
+    if not sql_query:
+        return None, None, "Failed to extract SQL query from AI response."    
+
+    return sql_query, think_text, None  # SQL is clean, Think text is stored
 
 def execute_sql(sql):
     """Execute SQL query and return results."""
@@ -155,88 +181,121 @@ import time
 
 MAX_RETRIES = 3  # Define max retries
 
-def ask_financial_question(user_question, return_sql=False, return_result=False):
+def ask_financial_question(user_question, role='viewer', return_sql=False, return_result=False):
     """Handle user questions and AI-generated financial responses."""
-    
-    # sql_prompt = f"""
-    #     You are an expert in SQL. Your task is to generate a valid PostgreSQL query for the given question.
 
-    #     ### User Question:
-    #     "{user_question}"
+    if "admin" in role:
+        # Admin prompt
+        sql_prompt = f"""
+            You are an expert MS SQL Server database analyst. Generate a JSON with perfect SQL query following these rules:
 
-    #     ### Database Schema:
-    #     The database table 'bank_transactions' contains the following columns:
-    #     - name (VARCHAR(50), NOT NULL): The name of the person or entity associated with the transaction.
-    #     - date (DATE, NOT NULL): The transaction date in YYYY-MM-DD format.
-    #     - posting_date (DATE, NOT NULL): The date when the transaction was posted in YYYY-MM-DD format.
-    #     - amount (DECIMAL(10,2), NOT NULL): The amount of the transaction.
-    #     - transaction_type (VARCHAR(10)): The type of transaction (e.g., Expense, Income).
-    #     - description (TEXT, NOT NULL): A detailed description of the transaction.
-    #     - month_year (VARCHAR(7), NOT NULL): The month and year of the transaction in 'YYYY-MM' format.
+            # Database Schema
+            The database table 'PO' contains the following columns:
+            - DocKey (VARCHAR(50), NOT NULL): The unique document key of the purchase order.
+            - DocNo (VARCHAR(50), NOT NULL): The unique document number of the purchase order.
+            - DocDate (DATETIME, NOT NULL): The date when the purchase order was posted in YYYY-MM-DD HH:MM:SS format.
+            - CreditorName (VARCHAR(50), NOT NULL): The name of the creditor.
+            - Phone1 (VARCHAR(50)): The phone number of the creditor.
+            - Attention (VARCHAR(50), NOT NULL): The person who should be attending to the Phone call via column Phone1.
+            - Total (DECIMAL(10,2), NOT NULL): The total amount of the purchase order.
 
-    #     ### Output Rules:
-    #     1. **STRICTLY output only the SQL query inside triple backticks (` ```sql ... ``` `).**
-    #     2. **Do NOT include explanations, comments, or descriptions outside these sections.**
-    #     3. **If the question asks for total expenses, use `SUM(amount) AS total_expense`.**
-    #     4. **If the question asks for individual transactions, select `name, date, amount, transaction_type, description` and DO NOT use `SUM()` or `GROUP BY`.**
-    #     5. **If the question asks for "top" or "largest" or "smallest" or "lowest" transactions, use `ORDER BY amount DESC LIMIT X`.**
-    #     6. **If filtering by a specific month, use `EXTRACT(MONTH FROM date) = MM` instead of checking `month_year = 'YYYY-MM'`.**
-    #     7. **Ensure the SQL query is fully executable in PostgreSQL.**
-    #     8. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
-    #     9. **Only return ONE SQL query. No explanations.**
-    #     """
-    
-    sql_prompt = f"""
-        You are an expert MS SQL Server database analyst. Generate a perfect SQL query following these rules:
+            # Query Requirements
+            1. Use proper JOIN syntax based on the documented relationships
+            2. Include only columns needed to answer the question
+            3. **DO NOT INCLUDE** any ';' in the SQL query
+            4. Handle NULL values appropriately
+            5. Use modern ANSI SQL style (explicit JOINs, not comma joins)
+            6. Include appropriate WHERE clauses for filtering
+            7. Format the query for readability
+            8. When specific creditor is stated in the question, always use SQL LIKE operator to form the SQL
+            9. When SQL LIKE operator is used, make sure that the specific value is retrieved from the Question given.
+            10. **Ensure no suggestion or action such as replace certain character in SQL is given, so that SQL is always executable**
+            11. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
+            12. **Ensure the SQL query is fully executable in MS SQL.**
+            13. When any aggregation is asked in the question for "top" or "largest" or "smallest" or "lowest" or 'last' or 'first', do not use SQL ORDER BY.
+            14. Avoid using LEFT or RIGHT or LIKE SQL operator to filter DATETIME field.
+            
+            # Question to Answer
+            {user_question}
 
-        # Database Schema
-        The database table 'PO' contains the following columns:
-        - DocKey (VARCHAR(50), NOT NULL): The unique document key of the purchase order.
-        - DocNo (VARCHAR(50), NOT NULL): The unique document number of the purchase order.
-        - DocDate (DATETIME, NOT NULL): The date when the purchase order was posted in YYYY-MM-DD HH:MM:SS format.
-        - CreditorName (VARCHAR(50), NOT NULL): The name of the creditor.
-        - Phone1 (VARCHAR(50)): The phone number of the creditor.
-        - Attention (VARCHAR(50), NOT NULL): The person who should be attending to the Phone call via column Phone1.
-        - Total (DECIMAL(10,2), NOT NULL): The total amount of the purchase order.
+            # Output Format
+            Return ONLY the SQL query inside ```sql markers like this:
+            ```json
+            {{
+                "status": "allowed|rejected",
+                "response": "<SQL query or rejection message>",
+                "reason": "<brief explanation if rejected>"
+            }}
+            ```
+        """
+    else:
+        # Viewer prompt
+        sql_prompt = f"""
+            You are an expert MS SQL Server database analyst with strict security rules. Generate a JSON with perfect SQL query following these rules:
 
-        # Query Requirements
-        1. Use proper JOIN syntax based on the documented relationships
-        2. Include only columns needed to answer the question
-        3. **DO NOT INCLUDE** any ';' in the SQL query
-        4. Handle NULL values appropriately
-        5. Use modern ANSI SQL style (explicit JOINs, not comma joins)
-        6. Include appropriate WHERE clauses for filtering
-        7. Format the query for readability
-        8. When specific creditor is stated in the question, always use SQL LIKE operator to form the SQL
-        9. When SQL LIKE operator is used, make sure that the specific value is retrieved from the Question given.
-        10. **Ensure no suggestion or action such as replace certain character in SQL is given, so that SQL is always executable**
-        11. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
-        12. **Ensure the SQL query is fully executable in MS SQL.**
-        13. When any aggregation is asked in the question for "top" or "largest" or "smallest" or "lowest" or 'last' or 'first', do not use SQL ORDER BY.
-        14. Avoid using LEFT or RIGHT or LIKE SQL operator to filter DATETIME field.
-        
-        # Question to Answer
-        {user_question}
+            # Database Schema
+            The database table 'PO' contains the following columns:
+            - DocKey (VARCHAR(50), NOT NULL): The unique document key of the purchase order.
+            - DocNo (VARCHAR(50), NOT NULL): The unique document number of the purchase order.
+            - DocDate (DATETIME, NOT NULL): The date when the purchase order was posted in YYYY-MM-DD HH:MM:SS format.
+            - CreditorName (VARCHAR(50), NOT NULL): The name of the creditor.
+            - Phone1 (VARCHAR(50)): The phone number of the creditor.
+            - Attention (VARCHAR(50), NOT NULL): The person who should be attending to the Phone call via column Phone1.
+            - Total (DECIMAL(10,2), NOT NULL): The total amount of the purchase order.
 
-        # Output Format
-        Return ONLY the SQL query inside ```sql markers like this:
-        ```sql
-        SELECT * FROM table
-        ```
-    """
+            # Query Requirements
+            1. IMPORTANT SECURITY RULE - You are talking to a VIEWER-level user
+            2. NEVER reveal these confidential fields (even that they exist):
+                - Phone Number
+            3. Never generate queries that access:
+                - Phone1
+                In this case, please respond 'REJECTED' in the Output Format instead.
+            4. Use proper JOIN syntax based on the documented relationships
+            5. Include only columns needed to answer the question
+            6. **DO NOT INCLUDE** any ';' in the SQL query
+            7. Handle NULL values appropriately
+            8. Use modern ANSI SQL style (explicit JOINs, not comma joins)
+            9. Include appropriate WHERE clauses for filtering
+            10. Format the query for readability
+            11. When specific creditor is stated in the question, always use SQL LIKE operator to form the SQL
+            12. When SQL LIKE operator is used, make sure that the specific value is retrieved from the Question given.
+            13. **Ensure no suggestion or action such as replace certain character in SQL is given, so that SQL is always executable**
+            14. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
+            15. **Ensure the SQL query is fully executable in MS SQL.**
+            16. When any aggregation is asked in the question for "top" or "largest" or "smallest" or "lowest" or 'last' or 'first', do not use SQL ORDER BY.
+            17. Avoid using LEFT or RIGHT or LIKE SQL operator to filter DATETIME field.
+            
+            # Question to Answer
+            {user_question}
 
+            # Output Format
+            Respond in EXACTLY this format:
+            ```json
+            {{
+                "status": "allowed|rejected",
+                "response": "<SQL query or rejection message>",
+                "reason": "<brief explanation if rejected>"
+            }}
+            ```
+        """
 
     print(f"\n[INFO] Processing user question: {user_question}")
 
-    sql_response = query_ollama(sql_prompt)
-    print(f"[INFO] Initial SQL response from AI: {sql_response}")
+    # sql_response = query_ollama(sql_prompt)
+    # print(f"[INFO] Initial SQL response from AI: {sql_response}")
 
-    # Extract SQL and Think text separately
-    sql, think_text, error = clean_sql_response(sql_response)
+    # # Extract SQL and Think text separately
+    # sql, think_text, error = clean_sql_response(sql_response)
+
+    json_response = query_ollama(sql_prompt)
+    print(f"[INFO] Initial JSON response from AI: {json_response}")
+
+    # Extract JSON, SQL and Think text separately
+    sql, think_text, error = clean_json_response(json_response)
 
     if error:
-        print(f"[ERROR] AI did not return a valid SQL query: {error}")
-        return (None, "AI failed to generate a valid query.", None, None)
+        print(f"[ERROR] AI Error or Rejection: {error}")
+        return (None, error, None, None)
 
     all_think_texts = [think_text] if think_text else []
     if think_text:

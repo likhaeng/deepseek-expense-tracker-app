@@ -6,3 +6,4 @@ python-dotenv==1.0.0  # For loading environment variables
 matplotlib==3.8.2  # For visualizations
 plotly==5.18.0     # For interactive graphs
 seaborn
+openpyxl
