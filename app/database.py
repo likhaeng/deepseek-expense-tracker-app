@@ -1,5 +1,6 @@
 import os
-import psycopg2
+# import psycopg2
+import pyodbc
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -7,11 +8,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database credentials from .env
-DB_HOST = os.getenv("POSTGRES_HOST")
-DB_PORT = os.getenv("POSTGRES_PORT")
-DB_USER = os.getenv("POSTGRES_USER")
-DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-DB_NAME = os.getenv("POSTGRES_DB")
+# DB_HOST = os.getenv("POSTGRES_HOST")
+# DB_PORT = os.getenv("POSTGRES_PORT")
+# DB_USER = os.getenv("POSTGRES_USER")
+# DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+# DB_NAME = os.getenv("POSTGRES_DB")
 # DB_HOST = creds.POSTGRES_HOST
 # DB_PORT = creds.POSTGRES_PORT
 # DB_USER = creds.POSTGRES_USER
@@ -19,14 +20,22 @@ DB_NAME = os.getenv("POSTGRES_DB")
 # DB_NAME = creds.POSTGRES_DB
 
 # Establish database connection
-def get_db_connection():
-    return psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        dbname=DB_NAME
-    )
+# def get_db_connection():
+#     return psycopg2.connect(
+#         host=DB_HOST,
+#         port=DB_PORT,
+#         user=DB_USER,
+#         password=DB_PASSWORD,
+#         dbname=DB_NAME
+#     )
+
+def get_sql_connection(server, database, username=None, password=None):
+    conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password};'
+    try:
+        return pyodbc.connect(conn_str)
+    except Exception as e:
+        print(f"Connection error: {e}")
+        return None
 
 # Create transactions table if it doesn't exist
 def create_table():
@@ -42,28 +51,38 @@ def create_table():
         month_year VARCHAR(7) NOT NULL
     );
     """
-    conn = get_db_connection()
+    conn = get_sql_connection(
+        server="DESKTOP-934DC6L\SQLEXPRESS",
+        database="AED_BLUE",
+        username="sa",
+        password="@BoitAdmin"
+    )
     cursor = conn.cursor()
     cursor.execute(query)
     conn.commit()
     cursor.close()
     conn.close()
 
+# NOTE: Temporary not applicable as too many not null fields to be integrated from AutoCount database PO table
 # Insert transactions into the database (avoid duplicates)
 def insert_transactions(df):
-    conn = get_db_connection()
+    conn = get_sql_connection(
+        server="DESKTOP-934DC6L\SQLEXPRESS",
+        database="AED_BLUE",
+        username="sa",
+        password="@BoitAdmin"
+    )
     cursor = conn.cursor()
 
     # print(DB_NAME)
 
     # SQL Query for inserting data (ignores duplicates)
     insert_query = """
-    INSERT INTO bank_transactions (name, date, posting_date, amount, transaction_type, description, month_year)
-    VALUES (%s, %s, %s, %s, %s, %s, %s);
+    INSERT INTO PO (DocNo, DocDate, CreditorName, Phone1, Attention, Total) VALUES (?, ?, ?, ?, ?, ?, ?);
     """
 
     # Convert DataFrame to a list of tuples
-    records = df[['Name', 'date', 'posting_date', 'amount', 'transaction_type', 'description', 'month_year']].values.tolist()
+    records = df[['DocNo', 'DocDate', 'CreditorName', 'Phone1', 'Attention', 'Total']].values.tolist()
 
     # Execute batch insert
     cursor.executemany(insert_query, records)
@@ -74,7 +93,12 @@ def insert_transactions(df):
 
 # Fetch transactions for a specific user
 def get_transactions(name):
-    conn = get_db_connection()
+    conn = get_sql_connection(
+        server="DESKTOP-934DC6L\SQLEXPRESS",
+        database="AED_BLUE",
+        username="sa",
+        password="@BoitAdmin"
+    )
     cursor = conn.cursor()
 
     query = "SELECT * FROM bank_transactions WHERE name = %s ORDER BY date DESC"

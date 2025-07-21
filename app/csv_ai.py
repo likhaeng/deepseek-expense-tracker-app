@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 # 🔹 Define Ollama API Endpoint
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "deepseek-r1:8b"
+MODEL = "deepseek-r1:7b"
 
 def query_ollama(prompt):
     """Send a request to Ollama's local API and return the response."""
@@ -34,10 +34,10 @@ def batch_categorize_transactions(df):
     logging.info("🔄 Starting AI-based batch transaction categorization...")
     
     # 🔹 Format transactions for AI processing
-    transactions_list = [{"description": desc} for desc in df["description"]]
+    transactions_list = [{"description": desc} for desc in df["CreditorName"]]
     
     categorization_prompt = f"""
-    You are an expert financial assistant. Categorize each transaction based on its description.
+    You are an expert financial assistant. Categorize each transaction based on its Total amount.
 
     ### Transactions:
     {json.dumps(transactions_list, indent=2)}
@@ -92,7 +92,7 @@ def batch_categorize_transactions(df):
                     logging.info(f"Extracted AI Category Map: {ai_category_map}")
 
                     # 🔹 Apply AI categories to dataframe using a lookup
-                    df["Category"] = df["description"].map(lambda desc: ai_category_map.get(desc, "Other"))
+                    df["Category"] = df["CreditorName"].map(lambda desc: ai_category_map.get(desc, "Other"))
                     logging.info("✅ All transactions categorized successfully.")
                     break  # ✅ Successful parsing, exit loop
 
@@ -127,8 +127,27 @@ def generate_insights(df):
     # 🔹 Convert full dataframe to JSON for AI processing (keeping "Category" column)
     transactions_json = df.to_json(orient="records")
 
+    # insights_prompt = f"""
+    # You are an expert financial analyst. Analyze the **full transaction data** below to identify financial trends, spending patterns, and anomalies.
+
+    # ### Full Transactions Data:
+    # {transactions_json}
+
+    # ### Instructions:
+    # - Identify **which transactions have the highest spending**.
+    # - Detect **any unusual or high-value transactions that stand out**.
+    # - Spot **patterns in spending behavior** across different merchants and transaction types.
+    # - Identify **repeated transactions** (such as subscriptions or recurring expenses).
+    # - Suggest **budget improvements based on transaction history**.
+    # - Provide insights on **potential cost-saving opportunities**.
+    # - The "Category" column is available for reference, but do not rely on it—derive insights from the full data.
+
+    # Provide your insights in a structured, concise format:
+    # """
+
     insights_prompt = f"""
-    You are an expert financial analyst. Analyze the **full transaction data** below to identify financial trends, spending patterns, and anomalies.
+    You are an expert financial analyst. 
+    Analyze the **full transaction data** below to identify financial trends, spending patterns, and anomalies.
 
     ### Full Transactions Data:
     {transactions_json}
@@ -138,9 +157,7 @@ def generate_insights(df):
     - Detect **any unusual or high-value transactions that stand out**.
     - Spot **patterns in spending behavior** across different merchants and transaction types.
     - Identify **repeated transactions** (such as subscriptions or recurring expenses).
-    - Suggest **budget improvements based on transaction history**.
-    - Provide insights on **potential cost-saving opportunities**.
-    - The "Category" column is available for reference, but do not rely on it—derive insights from the full data.
+    - Always generate amount value as MYR (RM) instead of US dollar ($)
 
     Provide your insights in a structured, concise format:
     """

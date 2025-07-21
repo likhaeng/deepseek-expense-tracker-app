@@ -16,13 +16,13 @@ def plot_spending_chart(df):
         return
 
     # ✅ Apply Dark Theme
-    plt.style.use("dark_background")
-    sns.set_palette("magma")  # Use a dark-friendly color palette
-    sns.set_style("dark")
+    # plt.style.use("dark_background")
+    # sns.set_palette("magma")  # Use a dark-friendly color palette
+    # sns.set_style("dark")
 
     # 1️⃣ **Category-wise Spending Breakdown (Improved Bar Chart)**
-    st.subheader("📊 Spending by Category")
-    category_spending = df[df["transaction_type"] == "Expense"].groupby("description")["amount"].sum().sort_values(ascending=False)
+    st.subheader("📊 Spending by Creditor")
+    category_spending = df.groupby("CreditorName")["Total"].sum().sort_values(ascending=False)
 
     if not category_spending.empty:
         top_categories = category_spending[:10]  # Show only top 10 spending categories
@@ -31,28 +31,28 @@ def plot_spending_chart(df):
         fig, ax = plt.subplots(figsize=(5, 2.5))  # Adjust size for readability
         sns.barplot(x=top_categories.values, y=category_labels, ax=ax, palette="coolwarm")
         
-        ax.set_xlabel("Total Amount (₹)", color="white")
-        ax.set_ylabel("Category", color="white")
-        ax.set_title("Top 10 Spending Categories", color="white")
-        ax.tick_params(colors="white")
+        ax.set_xlabel("Total Amount (RM)")
+        ax.set_ylabel("Creditor")
+        ax.set_title("Top 10 Amount Creditors")
+        ax.tick_params()
 
         st.pyplot(fig)
     else:
         st.warning("No expense data available for category breakdown.")
 
     # 2️⃣ **Income vs Expense Comparison (Bar Chart)**
-    st.subheader("💰 Income vs Expense")
-    income_expense = df.groupby("transaction_type")["amount"].sum()
+    # st.subheader("💰 Income vs Expense")
+    # income_expense = df.groupby("transaction_type")["amount"].sum()
 
-    if not income_expense.empty:
-        fig, ax = plt.subplots(figsize=(5, 2.5))
-        income_expense.plot(kind="bar", color=["green", "red"], ax=ax)
+    # if not income_expense.empty:
+    #     fig, ax = plt.subplots(figsize=(5, 2.5))
+    #     income_expense.plot(kind="bar", color=["green", "red"], ax=ax)
 
-        ax.set_ylabel("Total Amount (₹)", color="white")
-        ax.set_title("Income vs Expenses", color="white")
-        ax.set_xticklabels(["Expense", "Income"], rotation=0, color="white")
-        ax.tick_params(colors="white")
+    #     ax.set_ylabel("Total Amount (₹)", color="white")
+    #     ax.set_title("Income vs Expenses", color="white")
+    #     ax.set_xticklabels(["Expense", "Income"], rotation=0, color="white")
+    #     ax.tick_params(colors="white")
 
-        st.pyplot(fig)
-    else:
-        st.warning("No sufficient data for income vs expense comparison.")
+    #     st.pyplot(fig)
+    # else:
+    #     st.warning("No sufficient data for income vs expense comparison.")

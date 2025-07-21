@@ -1,28 +1,37 @@
 import os
-import psycopg2
+# import psycopg2
+import pyodbc
 import requests
 import re
 import time
 
 # PostgreSQL Connection Config
-DB_CONFIG = {
-    "dbname": os.getenv("POSTGRES_DB"),
-    "user": os.getenv("POSTGRES_USER"),
-    "password": os.getenv("POSTGRES_PASSWORD"),
-    "host": os.getenv("POSTGRES_HOST"),
-    "port": os.getenv("POSTGRES_PORT"),
-}
+# DB_CONFIG = {
+#     "dbname": os.getenv("POSTGRES_DB"),
+#     "user": os.getenv("POSTGRES_USER"),
+#     "password": os.getenv("POSTGRES_PASSWORD"),
+#     "host": os.getenv("POSTGRES_HOST"),
+#     "port": os.getenv("POSTGRES_PORT"),
+# }
 
 # Ollama API Config
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "deepseek-r1:8b"
+MODEL = "deepseek-r1:7b"
 # MODEL = "llama3.2"
 
-def get_pg_connection():
-    """Establish a connection to PostgreSQL."""
+# def get_pg_connection():
+#     """Establish a connection to PostgreSQL."""
+#     try:
+#         return psycopg2.connect(**DB_CONFIG)
+#     except psycopg2.Error as e:
+#         return None
+    
+def get_sql_connection(server, database, username=None, password=None):
+    conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password};'
     try:
-        return psycopg2.connect(**DB_CONFIG)
-    except psycopg2.Error as e:
+        return pyodbc.connect(conn_str)
+    except Exception as e:
+        print(f"Connection error: {e}")
         return None
 
 def query_ollama(prompt):
@@ -56,7 +65,12 @@ def clean_sql_response(sql_response):
 
 def execute_sql(sql):
     """Execute SQL query and return results."""
-    conn = get_pg_connection()
+    conn = get_sql_connection(
+        server="DESKTOP-934DC6L\SQLEXPRESS",
+        database="AED_BLUE",
+        username="sa",
+        password="@BoitAdmin"
+    )
     if not conn:
         return (None, None), "Database connection failed."
 
@@ -66,7 +80,7 @@ def execute_sql(sql):
             column_names = [desc[0] for desc in cur.description] if cur.description else []
             rows = cur.fetchall() if column_names else []
             return (column_names, rows), None
-    except psycopg2.Error as e:
+    except pyodbc.Error as e:
         return None, str(e)
     finally:
         conn.close()  # Ensure connection closes after execution
@@ -144,33 +158,72 @@ MAX_RETRIES = 3  # Define max retries
 def ask_financial_question(user_question, return_sql=False, return_result=False):
     """Handle user questions and AI-generated financial responses."""
     
+    # sql_prompt = f"""
+    #     You are an expert in SQL. Your task is to generate a valid PostgreSQL query for the given question.
+
+    #     ### User Question:
+    #     "{user_question}"
+
+    #     ### Database Schema:
+    #     The database table 'bank_transactions' contains the following columns:
+    #     - name (VARCHAR(50), NOT NULL): The name of the person or entity associated with the transaction.
+    #     - date (DATE, NOT NULL): The transaction date in YYYY-MM-DD format.
+    #     - posting_date (DATE, NOT NULL): The date when the transaction was posted in YYYY-MM-DD format.
+    #     - amount (DECIMAL(10,2), NOT NULL): The amount of the transaction.
+    #     - transaction_type (VARCHAR(10)): The type of transaction (e.g., Expense, Income).
+    #     - description (TEXT, NOT NULL): A detailed description of the transaction.
+    #     - month_year (VARCHAR(7), NOT NULL): The month and year of the transaction in 'YYYY-MM' format.
+
+    #     ### Output Rules:
+    #     1. **STRICTLY output only the SQL query inside triple backticks (` ```sql ... ``` `).**
+    #     2. **Do NOT include explanations, comments, or descriptions outside these sections.**
+    #     3. **If the question asks for total expenses, use `SUM(amount) AS total_expense`.**
+    #     4. **If the question asks for individual transactions, select `name, date, amount, transaction_type, description` and DO NOT use `SUM()` or `GROUP BY`.**
+    #     5. **If the question asks for "top" or "largest" or "smallest" or "lowest" transactions, use `ORDER BY amount DESC LIMIT X`.**
+    #     6. **If filtering by a specific month, use `EXTRACT(MONTH FROM date) = MM` instead of checking `month_year = 'YYYY-MM'`.**
+    #     7. **Ensure the SQL query is fully executable in PostgreSQL.**
+    #     8. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
+    #     9. **Only return ONE SQL query. No explanations.**
+    #     """
+    
     sql_prompt = f"""
-        You are an expert in SQL. Your task is to generate a valid PostgreSQL query for the given question.
+        You are an expert MS SQL Server database analyst. Generate a perfect SQL query following these rules:
 
-        ### User Question:
-        "{user_question}"
+        # Database Schema
+        The database table 'PO' contains the following columns:
+        - DocKey (VARCHAR(50), NOT NULL): The unique document key of the purchase order.
+        - DocNo (VARCHAR(50), NOT NULL): The unique document number of the purchase order.
+        - DocDate (DATETIME, NOT NULL): The date when the purchase order was posted in YYYY-MM-DD HH:MM:SS format.
+        - CreditorName (VARCHAR(50), NOT NULL): The name of the creditor.
+        - Phone1 (VARCHAR(50)): The phone number of the creditor.
+        - Attention (VARCHAR(50), NOT NULL): The person who should be attending to the Phone call via column Phone1.
+        - Total (DECIMAL(10,2), NOT NULL): The total amount of the purchase order.
 
-        ### Database Schema:
-        The database table 'bank_transactions' contains the following columns:
-        - name (VARCHAR(50), NOT NULL): The name of the person or entity associated with the transaction.
-        - date (DATE, NOT NULL): The transaction date in YYYY-MM-DD format.
-        - posting_date (DATE, NOT NULL): The date when the transaction was posted in YYYY-MM-DD format.
-        - amount (DECIMAL(10,2), NOT NULL): The amount of the transaction.
-        - transaction_type (VARCHAR(10)): The type of transaction (e.g., Expense, Income).
-        - description (TEXT, NOT NULL): A detailed description of the transaction.
-        - month_year (VARCHAR(7), NOT NULL): The month and year of the transaction in 'YYYY-MM' format.
+        # Query Requirements
+        1. Use proper JOIN syntax based on the documented relationships
+        2. Include only columns needed to answer the question
+        3. **DO NOT INCLUDE** any ';' in the SQL query
+        4. Handle NULL values appropriately
+        5. Use modern ANSI SQL style (explicit JOINs, not comma joins)
+        6. Include appropriate WHERE clauses for filtering
+        7. Format the query for readability
+        8. When specific creditor is stated in the question, always use SQL LIKE operator to form the SQL
+        9. When SQL LIKE operator is used, make sure that the specific value is retrieved from the Question given.
+        10. **Ensure no suggestion or action such as replace certain character in SQL is given, so that SQL is always executable**
+        11. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
+        12. **Ensure the SQL query is fully executable in MS SQL.**
+        13. When any aggregation is asked in the question for "top" or "largest" or "smallest" or "lowest" or 'last' or 'first', do not use SQL ORDER BY.
+        14. Avoid using LEFT or RIGHT or LIKE SQL operator to filter DATETIME field.
+        
+        # Question to Answer
+        {user_question}
 
-        ### Output Rules:
-        1. **STRICTLY output only the SQL query inside triple backticks (` ```sql ... ``` `).**
-        2. **Do NOT include explanations, comments, or descriptions outside these sections.**
-        3. **If the question asks for total expenses, use `SUM(amount) AS total_expense`.**
-        4. **If the question asks for individual transactions, select `name, date, amount, transaction_type, description` and DO NOT use `SUM()` or `GROUP BY`.**
-        5. **If the question asks for "top" or "largest" or "smallest" or "lowest" transactions, use `ORDER BY amount DESC LIMIT X`.**
-        6. **If filtering by a specific month, use `EXTRACT(MONTH FROM date) = MM` instead of checking `month_year = 'YYYY-MM'`.**
-        7. **Ensure the SQL query is fully executable in PostgreSQL.**
-        8. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
-        9. **Only return ONE SQL query. No explanations.**
-        """
+        # Output Format
+        Return ONLY the SQL query inside ```sql markers like this:
+        ```sql
+        SELECT * FROM table
+        ```
+    """
 
 
     print(f"\n[INFO] Processing user question: {user_question}")
