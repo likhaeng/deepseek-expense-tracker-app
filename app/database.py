@@ -4,6 +4,9 @@ import pyodbc
 import pandas as pd
 from dotenv import load_dotenv
 
+import re
+from typing import Dict, List
+
 # Load environment variables from .env
 load_dotenv()
 
@@ -53,7 +56,7 @@ def create_table():
     """
     conn = get_sql_connection(
         server="DESKTOP-934DC6L\SQLEXPRESS",
-        database="AED_BLUE",
+        database="AED_DIGITAL",
         username="sa",
         password="@BoitAdmin"
     )
@@ -68,7 +71,7 @@ def create_table():
 def insert_transactions(df):
     conn = get_sql_connection(
         server="DESKTOP-934DC6L\SQLEXPRESS",
-        database="AED_BLUE",
+        database="AED_DIGITAL",
         username="sa",
         password="@BoitAdmin"
     )
@@ -95,7 +98,7 @@ def insert_transactions(df):
 def get_transactions(name):
     conn = get_sql_connection(
         server="DESKTOP-934DC6L\SQLEXPRESS",
-        database="AED_BLUE",
+        database="AED_DIGITAL",
         username="sa",
         password="@BoitAdmin"
     )
@@ -113,3 +116,52 @@ def get_transactions(name):
     conn.close()
     
     return df
+
+
+def format_schema_with_metadata(schema: Dict) -> str:
+    """Generate detailed schema prompt with types and descriptions"""
+    prompt = "# Database Schema Documentation (MUST USE THESE STRUCTURES)\n\n"
+    
+    for table_name, table_info in schema["tables"].items():
+        # Table header
+        prompt += f"## Table: {table_name}\n"
+        if table_info.get("description"):
+            prompt += f"*Description*: {table_info['description']}\n\n"
+        
+        # Columns section
+        prompt += "### Columns\n"
+        for col in table_info["columns"]:
+            # Handle both string and dict column definitions
+            if isinstance(col, str):
+                col_name = col
+                col_type = "unknown"
+                col_desc = ""
+            else:  # Assume dict format
+                col_name = col["name"]
+                col_type = col.get("type", "unknown")
+                col_desc = col.get("description", "")
+            
+            # Format column line
+            prompt += f"- `{col_name}`"
+            prompt += f" ({col_type})" if col_type != "unknown" else ""
+            prompt += f": {col_desc}" if col_desc else ""
+            
+            # Add key indicators
+            if "primary_key" in table_info and col_name == table_info["primary_key"]:
+                prompt += " 🔑"
+            if "foreign_keys" in table_info and col_name in table_info["foreign_keys"]:
+                prompt += f" → {table_info['foreign_keys'][col_name]}"
+            prompt += "\n"
+        
+        # Add table relationships
+        if "foreign_keys" in table_info:
+            prompt += "\n### Relationships\n"
+            for fk_col, ref_table in table_info["foreign_keys"].items():
+                prompt += f"- Joins to `{ref_table}` via `{fk_col}`\n"
+        
+        prompt += "\n" + "-"*50 + "\n\n"  # Visual separator
+    print(prompt)
+    return prompt
+
+# if __name__ == "__main__":
+#     format_schema_with_metadata(DATABASE_SCHEMA)

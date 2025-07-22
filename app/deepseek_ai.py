@@ -5,6 +5,7 @@ import pyodbc
 import requests
 import re
 import time
+from app.database import format_schema_with_metadata
 
 # PostgreSQL Connection Config
 # DB_CONFIG = {
@@ -26,7 +27,63 @@ MODEL = "deepseek-r1:7b"
 #         return psycopg2.connect(**DB_CONFIG)
 #     except psycopg2.Error as e:
 #         return None
-    
+
+AUTOCOUNT_SALES_DATABASE_SCHEMA = {
+    "tables": {
+        "vSalesOrder": {
+            "description": "Contains all sales order records",
+            "columns": [
+                {
+                    "name": "DocKey",
+                    "type": "INT",
+                    "description": "Unique document identifier"
+                },
+                {
+                    "name": "DebtorCompanyName",
+                    "type": "VARCHAR(100)",
+                    "description": "Debtor Name or Debtor Company Name"
+                },
+                {
+                    "name": "SalesAgent",
+                    "type": "VARCHAR(12)",
+                    "description": "Sales Agent Code"
+                }
+            ],
+            "primary_key": "DocKey"
+        },
+        "vSalesOrderDetail": {
+            "description": "Itemized records for each sales order",
+            "columns": [
+                {
+                    "name": "DocKey",
+                    "type": "INT",
+                    "description": "Unique document identifier"
+                },
+                {
+                    "name": "ItemDescription",
+                    "type": "VARCHAR(100)",
+                    "description": "Item Description"
+                },
+                {
+                    "name": "DeliveryDate",
+                    "type": "DATETIME",
+                    "description": "Delivery Date"
+                },
+                {
+                    "name": "SubTotal",
+                    "type": "DECIMAL(10,2)",
+                    "description": "Item Price"
+                }
+            ],
+            "foreign_keys": {
+                "DocKey": "vSalesOrder.DocKey"
+            }
+        }
+    }
+}
+# Shared variable for all AI prompt
+db_schema = format_schema_with_metadata(AUTOCOUNT_SALES_DATABASE_SCHEMA)
+
 def get_sql_connection(server, database, username=None, password=None):
     conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password};'
     try:
@@ -93,7 +150,7 @@ def execute_sql(sql):
     """Execute SQL query and return results."""
     conn = get_sql_connection(
         server="DESKTOP-934DC6L\SQLEXPRESS",
-        database="AED_BLUE",
+        database="AED_DIGITAL",
         username="sa",
         password="@BoitAdmin"
     )
@@ -115,6 +172,8 @@ def refine_sql_with_feedback(sql, error_msg):
     """Refine SQL query based on error feedback and return only SQL."""
     feedback_prompt = f"""
     The following SQL query failed to execute:
+
+    {db_schema}
 
     ```sql
     {sql}
@@ -189,31 +248,18 @@ def ask_financial_question(user_question, role='viewer', return_sql=False, retur
         sql_prompt = f"""
             You are an expert MS SQL Server database analyst. Generate a JSON with perfect SQL query following these rules:
 
-            # Database Schema
-            The database table 'PO' contains the following columns:
-            - DocKey (VARCHAR(50), NOT NULL): The unique document key of the purchase order.
-            - DocNo (VARCHAR(50), NOT NULL): The unique document number of the purchase order.
-            - DocDate (DATETIME, NOT NULL): The date when the purchase order was posted in YYYY-MM-DD HH:MM:SS format.
-            - CreditorName (VARCHAR(50), NOT NULL): The name of the creditor.
-            - Phone1 (VARCHAR(50)): The phone number of the creditor.
-            - Attention (VARCHAR(50), NOT NULL): The person who should be attending to the Phone call via column Phone1.
-            - Total (DECIMAL(10,2), NOT NULL): The total amount of the purchase order.
+            {db_schema}
 
             # Query Requirements
-            1. Use proper JOIN syntax based on the documented relationships
-            2. Include only columns needed to answer the question
-            3. **DO NOT INCLUDE** any ';' in the SQL query
-            4. Handle NULL values appropriately
-            5. Use modern ANSI SQL style (explicit JOINs, not comma joins)
-            6. Include appropriate WHERE clauses for filtering
-            7. Format the query for readability
-            8. When specific creditor is stated in the question, always use SQL LIKE operator to form the SQL
-            9. When SQL LIKE operator is used, make sure that the specific value is retrieved from the Question given.
-            10. **Ensure no suggestion or action such as replace certain character in SQL is given, so that SQL is always executable**
-            11. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
-            12. **Ensure the SQL query is fully executable in MS SQL.**
-            13. When any aggregation is asked in the question for "top" or "largest" or "smallest" or "lowest" or 'last' or 'first', do not use SQL ORDER BY.
-            14. Avoid using LEFT or RIGHT or LIKE SQL operator to filter DATETIME field.
+            1. FIRST analyze which tables and columns are needed
+            2. THEN construct the SQL query using EXPLICIT JOIN conditions
+            3. FINALLY validate against these rules:
+            - Use only tables/columns from the schema above
+            - Respect primary/foreign key relationships
+            - Match exact column names
+            4. Include appropriate WHERE clauses for filtering
+            5. Format the query for readability
+            6. DO NOT INCLUDE primary_key in the SELECT section, only use them for database joining 
             
             # Question to Answer
             {user_question}
@@ -233,15 +279,7 @@ def ask_financial_question(user_question, role='viewer', return_sql=False, retur
         sql_prompt = f"""
             You are an expert MS SQL Server database analyst with strict security rules. Generate a JSON with perfect SQL query following these rules:
 
-            # Database Schema
-            The database table 'PO' contains the following columns:
-            - DocKey (VARCHAR(50), NOT NULL): The unique document key of the purchase order.
-            - DocNo (VARCHAR(50), NOT NULL): The unique document number of the purchase order.
-            - DocDate (DATETIME, NOT NULL): The date when the purchase order was posted in YYYY-MM-DD HH:MM:SS format.
-            - CreditorName (VARCHAR(50), NOT NULL): The name of the creditor.
-            - Phone1 (VARCHAR(50)): The phone number of the creditor.
-            - Attention (VARCHAR(50), NOT NULL): The person who should be attending to the Phone call via column Phone1.
-            - Total (DECIMAL(10,2), NOT NULL): The total amount of the purchase order.
+            {db_schema}
 
             # Query Requirements
             1. IMPORTANT SECURITY RULE - You are talking to a VIEWER-level user
@@ -279,6 +317,7 @@ def ask_financial_question(user_question, role='viewer', return_sql=False, retur
             ```
         """
 
+    print(sql_prompt)
     print(f"\n[INFO] Processing user question: {user_question}")
 
     # sql_response = query_ollama(sql_prompt)
