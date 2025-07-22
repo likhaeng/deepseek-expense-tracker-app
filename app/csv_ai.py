@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 # 🔹 Define Ollama API Endpoint
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "deepseek-r1:7b"
+MODEL = "deepseek-r1:32b"
 
 def query_ollama(prompt):
     """Send a request to Ollama's local API and return the response."""

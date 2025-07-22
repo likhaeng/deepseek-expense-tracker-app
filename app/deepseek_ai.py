@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 # import psycopg2
@@ -131,6 +132,14 @@ def clean_json_response(json_response):
     # Extract JSON and SQL query inside ```json ... ```
     json_match = re.search(r"```json(.*?)```", json_response, flags=re.DOTALL)
     json_string = json_match.group(1).strip() if json_match else None
+
+    # # testing code
+    # print("print(json_string)")
+    # json_string_bytes = json_string.encode('utf-8')
+    # encoded_bytes = base64.b64encode(json_string_bytes)
+    # print(encoded_bytes)
+
+    json_string = json_string.replace('"""', '"') # Resolve where sometimes AI generated JSON with """
     json_dict = json.loads(json_string)
     if "response" in json_dict:
         sql_query = json_dict["response"]
@@ -282,26 +291,21 @@ def ask_financial_question(user_question, role='viewer', return_sql=False, retur
             {db_schema}
 
             # Query Requirements
-            1. IMPORTANT SECURITY RULE - You are talking to a VIEWER-level user
-            2. NEVER reveal these confidential fields (even that they exist):
-                - Phone Number
-            3. Never generate queries that access:
-                - Phone1
+            1. FIRST analyze which tables and columns are needed
+            2. THEN construct the SQL query using EXPLICIT JOIN conditions
+            3. FINALLY validate against these rules:
+            - Use only tables/columns from the schema above
+            - Respect primary/foreign key relationships
+            - Match exact column names
+            4. IMPORTANT SECURITY RULE - You are talking to a VIEWER-level user
+            5. NEVER reveal these confidential fields (even that they exist):
+                - Amount, Price, Sales
+            6. Never generate queries that access:
+                - SubTotal
                 In this case, please respond 'REJECTED' in the Output Format instead.
-            4. Use proper JOIN syntax based on the documented relationships
-            5. Include only columns needed to answer the question
-            6. **DO NOT INCLUDE** any ';' in the SQL query
-            7. Handle NULL values appropriately
-            8. Use modern ANSI SQL style (explicit JOINs, not comma joins)
-            9. Include appropriate WHERE clauses for filtering
-            10. Format the query for readability
-            11. When specific creditor is stated in the question, always use SQL LIKE operator to form the SQL
-            12. When SQL LIKE operator is used, make sure that the specific value is retrieved from the Question given.
-            13. **Ensure no suggestion or action such as replace certain character in SQL is given, so that SQL is always executable**
-            14. **Do NOT include unnecessary placeholders or variable names—use real column names directly.**
-            15. **Ensure the SQL query is fully executable in MS SQL.**
-            16. When any aggregation is asked in the question for "top" or "largest" or "smallest" or "lowest" or 'last' or 'first', do not use SQL ORDER BY.
-            17. Avoid using LEFT or RIGHT or LIKE SQL operator to filter DATETIME field.
+            7. Include appropriate WHERE clauses for filtering
+            8. Format the query for readability
+            9. DO NOT INCLUDE primary_key in the SELECT section, only use them for database joining 
             
             # Question to Answer
             {user_question}
