@@ -111,3 +111,30 @@ If you find it useful or have suggestions, **feel free to contribute** or **open
 ---
 
 💙 **If you found this useful, give it a ⭐ on GitHub and share your thoughts!**  
+
+
+## Executable File List
+Note: If it is a streamlit, update your launch.json accordingly in your own vscode environment. This is important for debugging.
+1. login.py (Python) (Streamlit)
+- Login/Logout authentication with simple config file as database
+- Upload csv file and populate data in md table format and generate graph (specified csv formatted file)
+- Perform AI analysis to the csv file uploaded
+- (WIP) Add data from uploaded csv file to database
+2. sharepoint_connection.py (Python)
+- Connect sharepoint to perform file download, file upload, file edit, file reading 
+3. medical_scrap_deep.py (Python) (RAG based)
+- process user query and lookup to pubmed or arxiv, then generate AI response according to the top x article found
+- NOTE: Potentially can be used for future automation
+4. rag_deep.py (Python) (Streamlit) (RAG based)
+- upload pdf to specific folder, and allow AI to do RAG and lookup into the uploaded document to generated response
+
+## Youtube study
+1. Deepseek explanation 
+- https://www.youtube.com/watch?v=4ptWsPi46Nc&t=160s&ab_channel=techie_ray
+2. Deepseek Fine Tuning Guide 
+- https://www.youtube.com/watch?v=fUT332Y2zA8&ab_channel=MervinPraison
+- https://www.youtube.com/watch?v=ZqoZDI0p1aI&t=416s&ab_channel=AIAnytime
+- https://www.youtube.com/watch?v=DM-kAwsFf1U&ab_channel=FreeBirdsCrew-DataScienceandGenAI
+3. Deepseek RAG Guide
+- https://www.youtube.com/watch?v=qNUbPw62-rk&ab_channel=KrishNaik
+NOTE: Refer to googlesheet on the difference of RAG and Fine Tuning
