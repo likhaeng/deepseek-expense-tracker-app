@@ -73,9 +73,12 @@ Context: {document_context}
 Answer:
 """
 PDF_STORAGE_PATH = 'document_store/pdfs/'
-EMBEDDING_MODEL = OllamaEmbeddings(model="deepseek-r1:7b")
+# Define Ollama Model
+# OLLAMA_MODEL = 'deepseek-r1:7b' # Use the correct model name in Ollama
+OLLAMA_MODEL = 'medllama2' # Use the correct model name in Ollama
+EMBEDDING_MODEL = OllamaEmbeddings(model=OLLAMA_MODEL)
 DOCUMENT_VECTOR_DB = InMemoryVectorStore(EMBEDDING_MODEL)
-LANGUAGE_MODEL = OllamaLLM(model="deepseek-r1:7b")
+LANGUAGE_MODEL = OllamaLLM(model=OLLAMA_MODEL)
 
 
 def save_uploaded_file(uploaded_file):
@@ -110,8 +113,6 @@ def generate_answer(user_query, context_documents):
 
 
 # UI Configuration
-
-
 st.title("📘 DocuMind AI")
 st.markdown("### Your Intelligent Document Assistant")
 st.markdown("---")

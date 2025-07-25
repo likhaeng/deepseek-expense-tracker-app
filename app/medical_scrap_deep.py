@@ -72,9 +72,14 @@ from bs4 import BeautifulSoup
 from pymed import PubMed
 import arxiv
 from ollama import Client  # Ollama Python client
+import urllib.parse
 
 # Initialize Ollama client (running locally)
 client = Client(host='http://localhost:11434')
+
+# Define Ollama Model
+# OLLAMA_MODEL = 'deepseek-r1:7b' # Use the correct model name in Ollama
+OLLAMA_MODEL = 'medllama2' # Use the correct model name in Ollama
 
 # --- PubMed Search Function (Same as Before) ---
 def search_pubmed(query, max_results=3):
@@ -92,6 +97,20 @@ def search_pubmed(query, max_results=3):
             "year": article.publication_date.year if article.publication_date else None,
         }
         articles.append(article_data)
+    return articles
+
+# --- ScienceDirect Search (Simplified Web Scraping) ---
+def search_sciencedirect(query, max_results=3):
+    base_url = "https://www.sciencedirect.com/search"
+    encoded_query = urllib.parse.quote(query)
+    params = {"qs": encoded_query}
+    response = requests.get(base_url, params=params)
+    soup = BeautifulSoup(response.text, "html.parser")
+    articles = []
+    for item in soup.select(".result-list-title")[:max_results]:
+        title = item.text.strip()
+        link = "https://www.sciencedirect.com" + item.find("a")["href"]
+        articles.append({"title": title, "url": link})
     return articles
 
 # --- ArXiv Search (Same as Before) ---
@@ -120,7 +139,7 @@ def generate_ollama_response(query, context):
     """
     
     response = client.generate(
-        model='deepseek-r1:7b',  # Use the correct model name in Ollama
+        model=OLLAMA_MODEL,
         prompt=prompt,
         system="You are a helpful scientific assistant. Use the provided articles to answer.",
     )
@@ -133,8 +152,10 @@ def generate_rag_response(query, sources="pubmed"):
         articles = search_pubmed(query)
     elif sources == "arxiv":
         articles = search_arxiv(query)
+    elif sources == "sciencedirect":
+        articles = search_sciencedirect(query)
     else:
-        raise ValueError("Supported sources: 'pubmed', 'arxiv'")
+        raise ValueError("Supported sources: 'pubmed', 'arxiv', 'sciencedirect'")
 
     if not articles:
         return "No relevant articles found."
@@ -154,6 +175,6 @@ def generate_rag_response(query, sources="pubmed"):
 # --- Example Usage ---
 if __name__ == "__main__":
     query = "Effect of consuming hydrogen rich substance"
-    print("Searching PubMed and generating answer with Ollama (DeepSeek R1)...")
-    response = generate_rag_response(query, sources="pubmed")
+    print("Searching PubMed and generating answer with Ollama (" + OLLAMA_MODEL + ")...")
+    response = generate_rag_response(query, sources="sciencedirect")
     print(response)
