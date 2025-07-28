@@ -73,6 +73,7 @@ from pymed import PubMed
 import arxiv
 from ollama import Client  # Ollama Python client
 import urllib.parse
+from log_to_database import log_to_db
 
 # Initialize Ollama client (running locally)
 client = Client(host='http://localhost:11434')
@@ -143,7 +144,8 @@ def generate_ollama_response(query, context):
         prompt=prompt,
         system="You are a helpful scientific assistant. Use the provided articles to answer.",
     )
-    return response['response']
+    print(response)
+    return response['response'], prompt
 
 # --- RAG Pipeline with Ollama ---
 def generate_rag_response(query, sources="pubmed"):
@@ -168,13 +170,16 @@ def generate_rag_response(query, sources="pubmed"):
         references.append(f"[{i+1}] {article['title']} - {article['url']}")
 
     # Step 3: Generate answer using Ollama (DeepSeek R1)
-    answer = generate_ollama_response(query, context)
+    answer, prompt = generate_ollama_response(query, context)
     answer_with_refs = f"{answer}\n\nReferences:\n" + "\n".join(references)
-    return answer_with_refs
+    return answer_with_refs, prompt
 
 # --- Example Usage ---
 if __name__ == "__main__":
+    source = 'pubmed' # change accordingly based on source to be used
     query = "Effect of consuming hydrogen rich substance"
     print("Searching PubMed and generating answer with Ollama (" + OLLAMA_MODEL + ")...")
-    response = generate_rag_response(query, sources="sciencedirect")
+    response, prompt = generate_rag_response(query, sources=source)
     print(response)
+    logging_data = [query, '', response, prompt, '', OLLAMA_MODEL, source]
+    log_to_db(logging_data)
