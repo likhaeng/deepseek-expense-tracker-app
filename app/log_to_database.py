@@ -12,10 +12,10 @@ def get_sql_connection(server, database, username=None, password=None):
 # def log_to_db(data_list):
 def log_to_db(user_query="", ai_think="", ai_response="", ai_prompt="", remarks="", ai_model="", tag="", process_time_second=0):
     conn = get_sql_connection(
-        server="DESKTOP-934DC6L\SQLEXPRESS",
+        server="DESKTOP-3T1535M",
         database="MedicalAI",
         username="sa",
-        password="@BoitAdmin"
+        password="@BoitAdmin2502"
     )
     cursor = conn.cursor()
 

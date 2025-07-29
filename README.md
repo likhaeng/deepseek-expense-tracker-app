@@ -135,6 +135,7 @@ Note: If it is a streamlit, update your launch.json accordingly in your own vsco
 - testing code for selenium on lookup existing element that can be reference from HTML DOM
 8. pubmed_web_scrap.py (Python) (Web Scrap)
 - successful web scrapping, which is integrated into medical_scrap_deep.py for conditional processing for pubmed
+9. rag_deep_remote.py (Python) (RAG Based) (Remote AI/Database Server)
 
 ## Youtube study
 1. Deepseek explanation 

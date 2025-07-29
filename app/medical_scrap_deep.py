@@ -79,9 +79,10 @@ from pubmed_web_scrap import search_pubmed as search_pubmed_manual
 from spacy_lib import extract_keywords_spacy
 
 # Initialize Ollama client (running locally)
-client = Client(host='http://localhost:11434')
+client = Client(host='http://172.20.1.48:11434')
 
 # Define Ollama Model
+# OLLAMA_MODEL = 'deepseek-r1:1.5b' # Use the correct model name in Ollama
 OLLAMA_MODEL = 'deepseek-r1:7b' # Use the correct model name in Ollama
 # OLLAMA_MODEL = 'medllama2' # Use the correct model name in Ollama
 
