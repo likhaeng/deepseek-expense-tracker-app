@@ -67,6 +67,7 @@
         # Would you like me to refine this for a specific medical specialty (e.g., dermatology, endocrinology)?
 
 import os
+from datetime import datetime
 import requests
 from bs4 import BeautifulSoup
 from pymed import PubMed
@@ -74,31 +75,58 @@ import arxiv
 from ollama import Client  # Ollama Python client
 import urllib.parse
 from log_to_database import log_to_db
+from pubmed_web_scrap import search_pubmed as search_pubmed_manual
+from spacy_lib import extract_keywords_spacy
 
 # Initialize Ollama client (running locally)
 client = Client(host='http://localhost:11434')
 
 # Define Ollama Model
-# OLLAMA_MODEL = 'deepseek-r1:7b' # Use the correct model name in Ollama
-OLLAMA_MODEL = 'medllama2' # Use the correct model name in Ollama
+OLLAMA_MODEL = 'deepseek-r1:7b' # Use the correct model name in Ollama
+# OLLAMA_MODEL = 'medllama2' # Use the correct model name in Ollama
 
 # --- PubMed Search Function (Same as Before) ---
-def search_pubmed(query, max_results=3):
-    pubmed = PubMed(tool="MyRAGApp", email="likhaeng@blueoceanit.com.my")
-    results = pubmed.query(query, max_results=max_results)
-    articles = []
-    for article in results:
-        article_data = {
-            "title": article.title,
-            "abstract": article.abstract,
-            "doi": article.doi,
-            "url": f"https://pubmed.ncbi.nlm.nih.gov/{article.pubmed_id}/",
-            "authors": ", ".join([author["lastname"] for author in article.authors]),
-            "journal": article.journal,
-            "year": article.publication_date.year if article.publication_date else None,
-        }
-        articles.append(article_data)
-    return articles
+def search_pubmed(query, is_pubmed_API=False, max_results=3):
+    # User Query to searchable keywords
+    keyword = extract_keywords_spacy(query)
+    # Conditional Handling to use pubmed API or manual web scrapping
+    log_remarks = ""
+    if is_pubmed_API:
+        pubmed = PubMed(tool="MyRAGApp", email="likhaeng@blueoceanit.com.my")
+        # PubMed API integration
+        results = pubmed.query(keyword, max_results=max_results)
+        # results = pubmed.query(query)
+        articles = []
+        for article in results:
+            formatted_pubmed_id = article.pubmed_id.splitlines()[0]
+            article_data = {
+                "title": article.title,
+                "abstract": article.abstract,
+                "doi": article.doi,
+                "url": f"https://pubmed.ncbi.nlm.nih.gov/{formatted_pubmed_id}/",
+                "authors": ", ".join([author["lastname"] for author in article.authors]),
+                "journal": article.journal,
+                "year": article.publication_date.year if article.publication_date else None,
+            }
+            articles.append(article_data)
+        log_remarks = "pubmed API integration"
+    else:
+        # PubMed Manual Web Scrapping integration
+        results = search_pubmed_manual(keyword, max_results=max_results)
+        articles = []
+        for article in results:
+            article_data = {
+                "title": article['title'],
+                "abstract": article['abstract'],
+                # "doi": article.doi,
+                "url": article['url'],
+                "authors": article['authors'],
+                # "journal": article.journal,
+                # "year": article.publication_date.year if article.publication_date else None,
+            }
+            articles.append(article_data)
+        log_remarks = "pubmed manual web scrapping"
+    return articles, log_remarks
 
 # --- ScienceDirect Search (Simplified Web Scraping) ---
 def search_sciencedirect(query, max_results=3):
@@ -149,9 +177,10 @@ def generate_ollama_response(query, context):
 
 # --- RAG Pipeline with Ollama ---
 def generate_rag_response(query, sources="pubmed"):
+    log_remarks = ""
     # Step 1: Retrieve relevant articles
     if sources == "pubmed":
-        articles = search_pubmed(query)
+        articles, log_remarks = search_pubmed(query)
     elif sources == "arxiv":
         articles = search_arxiv(query)
     elif sources == "sciencedirect":
@@ -160,7 +189,7 @@ def generate_rag_response(query, sources="pubmed"):
         raise ValueError("Supported sources: 'pubmed', 'arxiv', 'sciencedirect'")
 
     if not articles:
-        return "No relevant articles found."
+        return "No relevant articles found.", "", "Failed to retrieve relevant article"
 
     # Step 2: Format context with references
     context = ""
@@ -172,14 +201,27 @@ def generate_rag_response(query, sources="pubmed"):
     # Step 3: Generate answer using Ollama (DeepSeek R1)
     answer, prompt = generate_ollama_response(query, context)
     answer_with_refs = f"{answer}\n\nReferences:\n" + "\n".join(references)
-    return answer_with_refs, prompt
+    return answer_with_refs, prompt, log_remarks
 
 # --- Example Usage ---
 if __name__ == "__main__":
+    start_time = datetime.now()
     source = 'pubmed' # change accordingly based on source to be used
-    query = "Effect of consuming hydrogen rich substance"
+    # query = "Effect of consuming hydrogen rich substance"
+    # query = "hydrogen water"
+    query = "how hydrogen can reduce stress"
     print("Searching PubMed and generating answer with Ollama (" + OLLAMA_MODEL + ")...")
-    response, prompt = generate_rag_response(query, sources=source)
+    response, prompt, log_remarks = generate_rag_response(query, sources=source)
     print(response)
-    logging_data = [query, '', response, prompt, '', OLLAMA_MODEL, source]
-    log_to_db(logging_data)
+    end_time = datetime.now()
+    time_spent_second = (end_time-start_time).total_seconds()
+    log_to_db(
+        user_query=query, 
+        ai_think="", 
+        ai_response=response, 
+        ai_prompt=prompt, 
+        remarks=log_remarks, 
+        ai_model=OLLAMA_MODEL, 
+        tag=source,
+        process_time_second=time_spent_second
+    )
