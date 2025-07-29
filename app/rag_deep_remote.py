@@ -9,6 +9,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 # Chroma Library
 import chromadb
 from chromadb.utils.embedding_functions.ollama_embedding_function import OllamaEmbeddingFunction
+from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 # Python Library
 from datetime import datetime
 import multiprocessing
@@ -71,6 +72,10 @@ class ChromaDb:
             "url": "http://172.20.1.48:11434",
             "model_name": "nomic-embed-text:v1.5"
         }
+        # Define maximum how many splitted list of data that can be uploaded in a single batch
+        # e.g. if max_batch_size = 250, and document splitted into 207, then it will generate only 1 batch to process
+        # e.g. if max_batch_size = 250, and document splitted into 300, then it will be separated into 2 batches to process
+        self.max_batch_size = 250
 
     # If error is received during debug, then connection fails
     def verify_connection(self):
@@ -85,25 +90,18 @@ class ChromaDb:
                 url=self.custom_embedding_model["url"],  # Default Ollama server address
                 model_name=self.custom_embedding_model["model_name"] # Or your specific embedding model like 'llama2', 'deepseek-r1' etc.
             )
-            self.chroma_client.get_or_create_collection(
-                name=self.collection_name,
-                embedding_function=ollama_ef,
-                metadata={
-                    "description": "MedicalAI ResearchDoc Collection",
-                    "created": str(datetime.now())
-                },
-                configuration=self.collection_config
-            )
         else:
-            # Default embedding model as SentenceTransformers https://docs.trychroma.com/docs/collections/manage-collections
-            self.chroma_client.get_or_create_collection(
-                name=self.collection_name,
-                metadata={
-                    "description": "MedicalAI ResearchDoc Collection",
-                    "created": str(datetime.now())
-                },
-                configuration=self.collection_config
-            )
+            ollama_ef = DefaultEmbeddingFunction() # Default embedding model as SentenceTransformers https://docs.trychroma.com/docs/collections/manage-collections
+        # Get or Create ChromaDB collection
+        self.chroma_client.get_or_create_collection(
+            name=self.collection_name,
+            embedding_function=ollama_ef,
+            metadata={
+                "description": "MedicalAI ResearchDoc Collection",
+                "created": str(datetime.now())
+            },
+            configuration=self.collection_config
+        )
 
     def delete_collection(self, collection_name):
         self.chroma_client.delete_collection(name=collection_name)
@@ -115,9 +113,16 @@ class ChromaDb:
     def review_specific_collection(self, collection_name):
         collection = self.chroma_client.get_collection(name=collection_name)
         print("Number of records in the collection: " + str(collection.count()))
-        print("First 10 records in the collection " + str(collection.peek()))
+        # print("First 10 records in the collection " + str(collection.peek()))
 
     def add_doc_to_collection(self, collection_name, docData):
+        # Dynamic data chunking process based on max batch size defined
+        docDataBatch = []
+        docDataCount = len(docData)
+        if docDataCount <= self.max_batch_size:
+            docDataBatch.append(docData)
+        else:
+            docDataBatch = [docData[i:i + self.max_batch_size] for i in range(0, len(docData), self.max_batch_size)]
         # Connect to ChromaDB Server
         chroma_conn = Chroma(
             collection_name=collection_name,
@@ -125,7 +130,8 @@ class ChromaDb:
             port=self.collection_port
         )
         # Add documents to ChromaDB (uses HTTP calls)
-        chroma_conn.add_documents(docData)
+        for docDataList in docDataBatch:
+            chroma_conn.add_documents(docDataList)
 
     def get_context_from_collection(self, collection_name, query):
         # Connect to ChromaDB Server
@@ -154,6 +160,30 @@ class DocProcessor:
         splits = text_splitter.split_documents(documents)
         return splits
     
+    def get_file_list(self):
+        file_list = []
+        for file in os.listdir(self.pdf_storage_path):
+            file_list.append(file)
+        return file_list
+    
+    def int_to_ordinal(self, n):
+        """
+        Converts an integer to its English ordinal representation.
+        e.g., 1 -> '1st', 2 -> '2nd', 3 -> '3rd', 4 -> '4th', 11 -> '11th'
+        """
+        if 10 <= n % 100 <= 20:  # Handles 11th, 12th, 13th
+            suffix = 'th'
+        else:
+            last_digit = n % 10
+            if last_digit == 1:
+                suffix = 'st'
+            elif last_digit == 2:
+                suffix = 'nd'
+            elif last_digit == 3:
+                suffix = 'rd'
+            else:
+                suffix = 'th'
+        return str(n) + suffix
 class RAG:
     def __init__(self):
         self.ollama_url = "http://172.20.1.48:11434"
@@ -206,23 +236,20 @@ if __name__ == "__main__":
     # 2. Load document into data
     # 3. Add data into ChromaDB collection/database
     # 4. Review database count and record
-    # print("Collection Creation & Review Start Time: " + str(datetime.now()))
-    # chromaMedical.init_collection()
-    # chromaMedical.review_collections()
-    # chromaMedical.review_specific_collection(collection_name=collection_name)
-    # print("Collection Creation & Review End Time: " + str(datetime.now()))
-    # # Add 1st doc
-    # print("Load and review 1st doc Start Time: " + str(datetime.now()))
-    # docData = docLoader.load_and_split_doc(doc_name="Python Programming.pdf")
-    # chromaMedical.add_doc_to_collection(collection_name=collection_name, docData=docData)
-    # chromaMedical.review_specific_collection(collection_name=collection_name)
-    # print("Load and review 1st doc End Time: " + str(datetime.now()))
-    # # Add 2nd doc
-    # print("Load and review 2nd doc Start Time: " + str(datetime.now()))
-    # docData = docLoader.load_and_split_doc(doc_name="html_tutorial.pdf")
-    # chromaMedical.add_doc_to_collection(collection_name=collection_name, docData=docData)
-    # chromaMedical.review_specific_collection(collection_name=collection_name)
-    # print("Load and review 2nd doc End Time: " + str(datetime.now()))
+    print("Collection Creation & Review Start Time: " + str(datetime.now()))
+    chromaMedical.init_collection()
+    chromaMedical.review_collections()
+    chromaMedical.review_specific_collection(collection_name=collection_name)
+    print("Collection Creation & Review End Time: " + str(datetime.now()))
+    # Process documents in a list based on a single folder path
+    docList = docLoader.get_file_list()
+    for idx, doc_name in enumerate(docList):
+        strOrdinal = docLoader.int_to_ordinal(idx + 1)
+        print("Load and review " + strOrdinal + " doc Start Time: " + str(datetime.now()))
+        docData = docLoader.load_and_split_doc(doc_name=doc_name)
+        chromaMedical.add_doc_to_collection(collection_name=collection_name, docData=docData)
+        chromaMedical.review_specific_collection(collection_name=collection_name)
+        print("Load and review " + strOrdinal + " doc End Time: " + str(datetime.now()))
 
     # 1st Test Result Review:
     # 1. After 1st doc is loaded, then records grow from 0 -> 207 (python pdf have 140 pages)
@@ -244,18 +271,25 @@ if __name__ == "__main__":
     # TODO: Try to fine tune the document loader so that it may process document in bigger size (chunk_size, chunk_overlap)
     # TODO: Try to split document into multiple batch of chunk if certain condition has been exceed. This is to avoid the upload timeout error that is stated in 1st Test Result Review
 
+    # Documents
+    # 1. Python Programming.pdf - 140 pages, 207 chunks
+    # 2. html_tutorial.pdf - 56 pages, 132 chunks
+    # 3. javanotes5.pdf - 699 pages, 2637 chunks
+    # 4. the-complete-reference-html-css-fifth-edition.pdf - 857 pages, 2305 chunks
+
     # Routine 2:
     # 1. Get collection/database
     # 2. Using available data, send user query/question to AI for response. RAG will be retrieved from the ChromaDB
     # 3. Log to database
     # RAG prompt
-    print("Get context from collection/database Start Time: " + str(datetime.now()))
-    # query = "Between Python and HTML, which is the better programming language?"
-    query = "I wish to learn how to create an e-commerce website. Between Python and HTML, which is the better programming language to use or learn?"
-    context = chromaMedical.get_context_from_collection(collection_name=collection_name, query=query)
-    print("Get context from collection/database End Time: " + str(datetime.now()))
-    # Generate AI response with RAG
-    ragProcess.generate_ollama_response(context=context, query=query)
+    # print("Get context from collection/database Start Time: " + str(datetime.now()))
+    # # query = "Between Python and HTML, which is the better programming language?"
+    # # query = "I am new to programming. Please suggest the best prgramming language to learn for as a beginner"
+    # query = "What can you tell me more about Java programming?"
+    # context = chromaMedical.get_context_from_collection(collection_name=collection_name, query=query)
+    # print("Get context from collection/database End Time: " + str(datetime.now()))
+    # # Generate AI response with RAG
+    # ragProcess.generate_ollama_response(context=context, query=query)
     
     # 1st Test Result Review:
 
