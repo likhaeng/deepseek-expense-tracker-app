@@ -127,6 +127,14 @@ Note: If it is a streamlit, update your launch.json accordingly in your own vsco
 - NOTE: Potentially can be used for future automation
 4. rag_deep.py (Python) (Streamlit) (RAG based)
 - upload pdf to specific folder, and allow AI to do RAG and lookup into the uploaded document to generated response
+5. rag_deep_multi_doc.py (Python) (RAG based)
+- similar to rag_deep.py, but support multiple document loading. Take time to process document into VECTOR which is a challenge
+6. sciencedirect_web_scrap.py (Python) (Web Scrap)
+- WIP due to challenge of sciencedirect which is blocked by paywall, and scrapping is not successfull, potentially due to their security enhancement
+7. selenium_test.py (Python) (Web Scrap)
+- testing code for selenium on lookup existing element that can be reference from HTML DOM
+8. pubmed_web_scrap.py (Python) (Web Scrap)
+- successful web scrapping, which is integrated into medical_scrap_deep.py for conditional processing for pubmed
 
 ## Youtube study
 1. Deepseek explanation 
