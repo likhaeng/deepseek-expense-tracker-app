@@ -1,0 +1,14 @@
+{
+    "SHAREPOINT_DOWNLOAD_FOLDER": [
+        {
+            "remote_folder": "/sites/ITHelpDesk2/Shared Documents/PythonIntegrationTest/Diabetes",
+            "local_folder": "Diabetes",
+            "chroma_collection_name": "medicalAI_diabetes"
+        },
+        {
+            "remote_folder": "/sites/ITHelpDesk2/Shared Documents/PythonIntegrationTest/ProgrammingLanguage",
+            "local_folder": "ProgrammingLanguage",
+            "chroma_collection_name": "medicalAI_programmingLanguage"
+        }
+    ]
+}

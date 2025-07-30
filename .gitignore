@@ -4,3 +4,5 @@ privateKey.key
 selfsigncert.crt
 selfsigncert.pem
 document_store/
+log/
+cache/

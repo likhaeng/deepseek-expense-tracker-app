@@ -12,6 +12,7 @@ from chromadb.utils.embedding_functions.ollama_embedding_function import OllamaE
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 # Python Library
 from datetime import datetime
+import logging
 import multiprocessing
 import os
 # Custom Library
@@ -42,6 +43,14 @@ from log_to_database import log_to_db
 # # Generate with Ollama
 # response = ollama_llm(prompt)
 # print(response)
+
+# Logging Config
+BASE_DIR    = os.path.realpath(os.path.join(os.path.dirname(__file__), '..'))
+now         = datetime.now()
+tmp_str     = str(now.strftime('%Y%m%d%H%M%S')) # To be used on log file naming
+log_path    = os.path.join(BASE_DIR, "log", 'prg_' + tmp_str + '.log')
+log_level   = logging.WARNING
+logging.basicConfig(format='%(asctime)s %(message)s', filename=log_path, level = log_level)
 
 class ChromaDb:
     def __init__(self):
@@ -108,12 +117,12 @@ class ChromaDb:
 
     def review_collections(self):
         collections = self.chroma_client.list_collections()
-        print(collections)
+        logging.warning(collections)
 
     def review_specific_collection(self, collection_name):
         collection = self.chroma_client.get_collection(name=collection_name)
-        print("Number of records in the collection: " + str(collection.count()))
-        # print("First 10 records in the collection " + str(collection.peek()))
+        logging.warning("Number of records in the collection: " + str(collection.count()))
+        # logging.warning("First 10 records in the collection " + str(collection.peek()))
 
     def add_doc_to_collection(self, collection_name, docData):
         # Dynamic data chunking process based on max batch size defined
@@ -188,11 +197,11 @@ class DocProcessor:
 class RAG:
     def __init__(self):
         self.ollama_url = "http://172.20.1.48:11434"
-        self.ollama_model_name = "deepseek-r1:7b"
+        self.ollama_model_name = "deepseek-r1:1.5b"
 
     def generate_ollama_response(self, context, query):
         start_time = datetime.now()
-        print("Generate AI Response (via RAG) Start Time: " + str(start_time))
+        logging.warning("Generate AI Response (via RAG) Start Time: " + str(start_time))
         ollama_llm = OllamaLLM(base_url=self.ollama_url, model=self.ollama_model_name)
         prompt = f"""Answer the question based on the context below:
             Context: {context}
@@ -201,9 +210,9 @@ class RAG:
 
         # Generate with Ollama
         response = ollama_llm(prompt)
-        print(response)
+        # logging.warning(response)
         end_time = datetime.now()
-        print("Generate AI Response (via RAG) End Time: " + str(end_time))
+        logging.warning("Generate AI Response (via RAG) End Time: " + str(end_time))
 
         # Log to DB
         log_remarks = "Remote Deepseek & ChromaDB Integration"
@@ -221,7 +230,7 @@ class RAG:
         )
 
 if __name__ == "__main__":
-    print("Python Classes Init Start Time: " + str(datetime.now()))
+    logging.warning("Python Classes Init Start Time: " + str(datetime.now()))
     collection_name = "ResearchDoc"
     chromaMedical = ChromaDb()
     # chromaMedical.verify_connection()
@@ -230,7 +239,7 @@ if __name__ == "__main__":
     # chromaMedical.review_specific_collection(collection_name=collection_name)
     docLoader = DocProcessor()
     ragProcess = RAG()
-    print("Python Classes Init End Time: " + str(datetime.now()))
+    logging.warning("Python Classes Init End Time: " + str(datetime.now()))
 
     # Routine list
     # 1 - Load document to collection
@@ -245,20 +254,20 @@ if __name__ == "__main__":
     # 3. Add data into ChromaDB collection/database
     # 4. Review database count and record
     if routine == "1":
-        print("Collection Creation & Review Start Time: " + str(datetime.now()))
+        logging.warning("Collection Creation & Review Start Time: " + str(datetime.now()))
         chromaMedical.init_collection()
         chromaMedical.review_collections()
         chromaMedical.review_specific_collection(collection_name=collection_name)
-        print("Collection Creation & Review End Time: " + str(datetime.now()))
+        logging.warning("Collection Creation & Review End Time: " + str(datetime.now()))
         # Process documents in a list based on a single folder path
         docList = docLoader.get_file_list()
         for idx, doc_name in enumerate(docList):
             strOrdinal = docLoader.int_to_ordinal(idx + 1)
-            print("Load and review " + strOrdinal + " doc Start Time: " + str(datetime.now()))
+            logging.warning("Load and review " + strOrdinal + " doc (" + doc_name + ") Start Time: " + str(datetime.now()))
             docData = docLoader.load_and_split_doc(doc_name=doc_name)
             chromaMedical.add_doc_to_collection(collection_name=collection_name, docData=docData)
             chromaMedical.review_specific_collection(collection_name=collection_name)
-            print("Load and review " + strOrdinal + " doc End Time: " + str(datetime.now()))
+            logging.warning("Load and review " + strOrdinal + " doc (" + doc_name + ") End Time: " + str(datetime.now()))
 
     # 1st Test Result Review:
     # 1. After 1st doc is loaded, then records grow from 0 -> 207 (python pdf have 140 pages)
@@ -292,12 +301,12 @@ if __name__ == "__main__":
     # 3. Log to database
     # RAG prompt
     if routine == "2":
-        print("Get context from collection/database Start Time: " + str(datetime.now()))
+        logging.warning("Get context from collection/database Start Time: " + str(datetime.now()))
         # query = "Between Python and HTML, which is the better programming language?"
         # query = "I am new to programming. Please suggest the best prgramming language to learn for as a beginner"
         query = "Based on the document given, what recommendation do we have for diabetes preventation?"
         context = chromaMedical.get_context_from_collection(collection_name=collection_name, query=query)
-        print("Get context from collection/database End Time: " + str(datetime.now()))
+        logging.warning("Get context from collection/database End Time: " + str(datetime.now()))
         # Generate AI response with RAG
         ragProcess.generate_ollama_response(context=context, query=query)
     
