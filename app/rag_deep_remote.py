@@ -184,6 +184,7 @@ class DocProcessor:
             else:
                 suffix = 'th'
         return str(n) + suffix
+
 class RAG:
     def __init__(self):
         self.ollama_url = "http://172.20.1.48:11434"
@@ -226,30 +227,38 @@ if __name__ == "__main__":
     # chromaMedical.verify_connection()
     # chromaMedical.init_collection()
     # chromaMedical.review_collections()
-    # chromaMedical.review_specific_collection(collection_name="ResearchDoc")
+    # chromaMedical.review_specific_collection(collection_name=collection_name)
     docLoader = DocProcessor()
     ragProcess = RAG()
     print("Python Classes Init End Time: " + str(datetime.now()))
+
+    # Routine list
+    # 1 - Load document to collection
+    # 2 - Test AI response
+    # 3 - Delete collection
+    # 4 - View collections and data count
+    routine = "2"
 
     # Routine 1: 
     # 1. Initialize collection/database
     # 2. Load document into data
     # 3. Add data into ChromaDB collection/database
     # 4. Review database count and record
-    print("Collection Creation & Review Start Time: " + str(datetime.now()))
-    chromaMedical.init_collection()
-    chromaMedical.review_collections()
-    chromaMedical.review_specific_collection(collection_name=collection_name)
-    print("Collection Creation & Review End Time: " + str(datetime.now()))
-    # Process documents in a list based on a single folder path
-    docList = docLoader.get_file_list()
-    for idx, doc_name in enumerate(docList):
-        strOrdinal = docLoader.int_to_ordinal(idx + 1)
-        print("Load and review " + strOrdinal + " doc Start Time: " + str(datetime.now()))
-        docData = docLoader.load_and_split_doc(doc_name=doc_name)
-        chromaMedical.add_doc_to_collection(collection_name=collection_name, docData=docData)
+    if routine == "1":
+        print("Collection Creation & Review Start Time: " + str(datetime.now()))
+        chromaMedical.init_collection()
+        chromaMedical.review_collections()
         chromaMedical.review_specific_collection(collection_name=collection_name)
-        print("Load and review " + strOrdinal + " doc End Time: " + str(datetime.now()))
+        print("Collection Creation & Review End Time: " + str(datetime.now()))
+        # Process documents in a list based on a single folder path
+        docList = docLoader.get_file_list()
+        for idx, doc_name in enumerate(docList):
+            strOrdinal = docLoader.int_to_ordinal(idx + 1)
+            print("Load and review " + strOrdinal + " doc Start Time: " + str(datetime.now()))
+            docData = docLoader.load_and_split_doc(doc_name=doc_name)
+            chromaMedical.add_doc_to_collection(collection_name=collection_name, docData=docData)
+            chromaMedical.review_specific_collection(collection_name=collection_name)
+            print("Load and review " + strOrdinal + " doc End Time: " + str(datetime.now()))
 
     # 1st Test Result Review:
     # 1. After 1st doc is loaded, then records grow from 0 -> 207 (python pdf have 140 pages)
@@ -282,20 +291,29 @@ if __name__ == "__main__":
     # 2. Using available data, send user query/question to AI for response. RAG will be retrieved from the ChromaDB
     # 3. Log to database
     # RAG prompt
-    # print("Get context from collection/database Start Time: " + str(datetime.now()))
-    # # query = "Between Python and HTML, which is the better programming language?"
-    # # query = "I am new to programming. Please suggest the best prgramming language to learn for as a beginner"
-    # query = "What can you tell me more about Java programming?"
-    # context = chromaMedical.get_context_from_collection(collection_name=collection_name, query=query)
-    # print("Get context from collection/database End Time: " + str(datetime.now()))
-    # # Generate AI response with RAG
-    # ragProcess.generate_ollama_response(context=context, query=query)
+    if routine == "2":
+        print("Get context from collection/database Start Time: " + str(datetime.now()))
+        # query = "Between Python and HTML, which is the better programming language?"
+        # query = "I am new to programming. Please suggest the best prgramming language to learn for as a beginner"
+        query = "Based on the document given, what recommendation do we have for diabetes preventation?"
+        context = chromaMedical.get_context_from_collection(collection_name=collection_name, query=query)
+        print("Get context from collection/database End Time: " + str(datetime.now()))
+        # Generate AI response with RAG
+        ragProcess.generate_ollama_response(context=context, query=query)
     
     # 1st Test Result Review:
 
     # Routine 3:
     # 1. Delete collection
-    # chromaMedical.delete_collection(collection_name="ResearchDoc")
+    if routine == "3":
+        chromaMedical.delete_collection(collection_name=collection_name)
+
+    # Routine 4:
+    # 1. View existing collections available
+    if routine == "4":
+        chromaMedical.review_collections()
+        chromaMedical.review_specific_collection(collection_name=collection_name)
+    
     
 
         

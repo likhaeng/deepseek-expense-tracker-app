@@ -3,3 +3,4 @@ app/__pycache__/
 privateKey.key
 selfsigncert.crt
 selfsigncert.pem
+document_store/
