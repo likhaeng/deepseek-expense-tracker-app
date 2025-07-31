@@ -10,5 +10,18 @@
             "local_folder": "ProgrammingLanguage",
             "chroma_collection_name": "medicalAI_programmingLanguage"
         }
-    ]
+    ],
+    "CHROMA_COLLECTION_HNSW_CONFIG_COMMENT": "For num_threads, Change according based on AI server spec. Check using lscpu at section CPU(s)",
+    "CHROMA_COLLECTION_HNSW_CONFIG": {
+        "hnsw": {
+            "space": "l2",
+            "ef_construction": 100,
+            "ef_search": 100,
+            "max_neighbors": 16,
+            "num_threads": 16, 
+            "batch_size": 100,
+            "sync_threshold": 1000,
+            "resize_factor": 1.2
+        }
+    }
 }

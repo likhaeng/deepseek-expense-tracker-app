@@ -42,6 +42,32 @@ sharepoint_download_folder          = config_json.get('SHAREPOINT_DOWNLOAD_FOLDE
 # Persist Variable Config
 sharepoint_last_process_datetime    = datetime.strptime(config['PERSIST_VARIABLE']['sharepoint_last_process_datetime'], "%Y%m%d%H%M%S")
 
+# Chroma Config (ini)
+chroma_collection_host                  = config['CHROMA']['collection_host']
+chroma_collection_port                  = int(config['CHROMA']['collection_port'])
+chroma_collection_embedding_model_url   = config['CHROMA']['collection_embedding_model_url']
+chroma_collection_embedding_model_name  = config['CHROMA']['collection_embedding_model_name']
+chroma_collection_max_batch_size        = int(config['CHROMA']['collection_max_batch_size'])
+# Chroma Config (json)
+chroma_collection_hnsw_config           = config_json.get('CHROMA_COLLECTION_HNSW_CONFIG')
+
+# Pubmed Config (ini)
+pubmed_base_url     = config['PUBMED']['base_url']
+pubmed_tool_name    = config['PUBMED']['tool_name']
+pubmed_email        = config['PUBMED']['email']
+
+# Spacy Config (ini)
+spacy_language_model = config['SPACY']['language_model']
+
+# MSSQL
+mssql_server    = os.getenv("MSSQL_SERVER")
+mssql_database  = os.getenv("MSSQL_DATABASE")
+mssql_username  = os.getenv("MSSQL_USERNAME")
+mssql_password  = os.getenv("MSSQL_PASSWORD")
+
+# OLLAMA
+ollama_base_url = config['OLLAMA']['base_url']
+
 # config.ini Update Function
 def update_config(section, key, value):
     config = ConfigParser()
