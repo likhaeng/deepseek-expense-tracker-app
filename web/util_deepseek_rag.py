@@ -11,6 +11,7 @@ from util_chroma_db import ChromaDb
 from util_doc_generator import DocumentGenerator
 # LLM Library
 from langchain_ollama import OllamaLLM
+from langchain_core.prompts import ChatPromptTemplate
 # MSSQL Library
 import pyodbc
 
@@ -60,9 +61,8 @@ class RAG:
             ## Rules:
             1. Cite references like [1], [2], etc.
         """
-
         # Generate with Ollama
-        response = ollama_llm(prompt)
+        response = ollama_llm.invoke(prompt)
         # If doing web scrap, append AI response with references received
         if isWebScrape:
             response = f"{response}\n\nReferences:\n\n" + "\n".join(webScrapReference)
@@ -133,21 +133,21 @@ if __name__ == "__main__":
     rag = RAG(model_name=model_name)
     # Scenario 1: Diabetes (Chroma only)
     query = "What is the potential activity that cause diabetes?"
-    ai_response, ai_think = rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_diabetes")
+    ai_response, ai_think, isDocRequest, document_file_path = rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_diabetes")
     print("AI Response: " + ai_response)
     print("AI Think: " + ai_think)
     # Scenario 2: Diabetes (Web Scrap only)
     query = "What is the potential activity that cause diabetes?"
-    ai_response, ai_think = rag.generate_ollama_response(query, isWebScrape=True)
+    ai_response, ai_think, isDocRequest, document_file_path = rag.generate_ollama_response(query, isWebScrape=True)
     print("AI Response: " + ai_response)
     print("AI Think: " + ai_think)
     # Scenario 3: Diabetes (Chroma and Web Scrap)
     query = "What is the potential activity that cause diabetes?"
-    ai_response, ai_think = rag.generate_ollama_response(query, isWebScrape=True, isChroma=True, collection_name="medicalAI_diabetes")
+    ai_response, ai_think, isDocRequest, document_file_path = rag.generate_ollama_response(query, isWebScrape=True, isChroma=True, collection_name="medicalAI_diabetes")
     print("AI Response: " + ai_response)
     print("AI Think: " + ai_think)
     # Scenario 4: Programmming (Chroma only)
     query = "What is the best programming language to learn AI?"
-    ai_response, ai_think = rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_programmingLanguage")
+    ai_response, ai_think, isDocRequest, document_file_path = rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_programmingLanguage")
     print("AI Response: " + ai_response)
     print("AI Think: " + ai_think)
