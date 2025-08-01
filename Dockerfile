@@ -5,6 +5,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    unixodbc unixodbc-dev \
     software-properties-common \
     git \
     && rm -rf /var/lib/apt/lists/*
