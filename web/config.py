@@ -59,14 +59,19 @@ pubmed_email        = config['PUBMED']['email']
 # Spacy Config (ini)
 spacy_language_model = config['SPACY']['language_model']
 
-# MSSQL
+# MSSQL Config (env)
 mssql_server    = os.getenv("MSSQL_SERVER")
 mssql_database  = os.getenv("MSSQL_DATABASE")
 mssql_username  = os.getenv("MSSQL_USERNAME")
 mssql_password  = os.getenv("MSSQL_PASSWORD")
 
-# OLLAMA
+# OLLAMA Config (ini)
 ollama_base_url = config['OLLAMA']['base_url']
+
+# Frontend Config (json)
+model_list                      = config_json.get('SUPPORTED_AI_MODEL')
+search_mode_and_collection_map  = config_json.get('SEARCH_MODE_AND_COLLECTION_MAP')
+search_mode_list                = config_json.get('SEARCH_MODE_AND_COLLECTION_MAP').keys()
 
 # config.ini Update Function
 def update_config(section, key, value):

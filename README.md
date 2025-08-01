@@ -148,6 +148,9 @@ Note: If it is a streamlit, update your launch.json accordingly in your own vsco
 - https://www.youtube.com/watch?v=qNUbPw62-rk&ab_channel=KrishNaik
 NOTE: Refer to googlesheet on the difference of RAG and Fine Tuning
 
-## Guide
-### Generate self sign cert
+## IMPORTANT NOTES
+### Sharepoint authentication: Generate self sign cert
 Refer to https://www.merge.dev/blog/sharepoint-api-python. In this guide, take note on the section **Authenticate with ClientContext**. Following this step, navigate to https://github.com/vgrem/Office365-REST-Python-Client/wiki/How-to-connect-to-SharePoint-Online-with-certificate-credentials for the commands to generate self sign cert
+
+### Spacy language model installation: Library used to extract keyword from sentence for web scrapping
+After installed spacy using command `pip install spacy`, make sure that the language model is also installed using command `python -m spacy download en_core_web_sm`. Make sure this is done **when you are inside your python virtual environment**

@@ -34,9 +34,14 @@ class RAG:
         if isChroma:
             chromaContext = self.chromaDb.get_context_from_collection(collection_name=collection_name, query=query)
         # Web Scrap Init
-        webScrapArticle=""
+        webScrapArticle = ""
+        webScrapContext = ""
+        webScrapReference = []
         if isWebScrape:
             webScrapArticle = self.pubMed.search_pubmed(query=query)
+            for i, article in enumerate(webScrapArticle):
+                webScrapContext += f"Article {i+1}: {article['title']}\nAbstract: {article.get('abstract', 'N/A')}\n\n"
+                webScrapReference.append(f"[{i+1}] {article['title']} - {article['url']}")
         # AI response generation start
         start_time = datetime.now()
         logging.warning("Generate AI Response (via RAG) Start Time")
@@ -55,6 +60,9 @@ class RAG:
 
         # Generate with Ollama
         response = ollama_llm(prompt)
+        # If doing web scrap, append AI response with references received
+        if isWebScrape:
+            response = f"{response}\n\nReferences:\n" + "\n".join(webScrapReference)
         end_time = datetime.now()
         logging.warning("Generate AI Response (via RAG) End")
 
@@ -62,7 +70,7 @@ class RAG:
         log_remarks = "Web, Remote Deepseek, ChromaDB and Web Scrapping Integration"
         time_spent_second = (end_time-start_time).total_seconds()
         sourceFileName = os.path.basename(__file__)
-        self.log_to_db(
+        ai_response, ai_think = self.log_to_db(
             user_query=query, 
             ai_think="", 
             ai_response=response, 
@@ -72,6 +80,7 @@ class RAG:
             tag=sourceFileName,
             process_time_second=time_spent_second
         )
+        return ai_response, ai_think
     
     def get_sql_connection(self, server, database, username=None, password=None):
         conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password};'
@@ -107,6 +116,7 @@ class RAG:
         # Close connection after data insertion
         cursor.close()
         conn.close()
+        return ai_response, ai_think
 
 if __name__ == "__main__":
     # Frontend need to provide ALL the hardcoded values below
@@ -114,13 +124,21 @@ if __name__ == "__main__":
     rag = RAG(model_name=model_name)
     # Scenario 1: Diabetes (Chroma only)
     query = "What is the potential activity that cause diabetes?"
-    rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_diabetes")
+    ai_response, ai_think = rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_diabetes")
+    print("AI Response: " + ai_response)
+    print("AI Think: " + ai_think)
     # Scenario 2: Diabetes (Web Scrap only)
     query = "What is the potential activity that cause diabetes?"
-    rag.generate_ollama_response(query, isWebScrape=True)
+    ai_response, ai_think = rag.generate_ollama_response(query, isWebScrape=True)
+    print("AI Response: " + ai_response)
+    print("AI Think: " + ai_think)
     # Scenario 3: Diabetes (Chroma and Web Scrap)
     query = "What is the potential activity that cause diabetes?"
-    rag.generate_ollama_response(query, isWebScrape=True, isChroma=True, collection_name="medicalAI_diabetes")
+    ai_response, ai_think = rag.generate_ollama_response(query, isWebScrape=True, isChroma=True, collection_name="medicalAI_diabetes")
+    print("AI Response: " + ai_response)
+    print("AI Think: " + ai_think)
     # Scenario 4: Programmming (Chroma only)
     query = "What is the best programming language to learn AI?"
-    rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_programmingLanguage")
+    ai_response, ai_think = rag.generate_ollama_response(query, isChroma=True, collection_name="medicalAI_programmingLanguage")
+    print("AI Response: " + ai_response)
+    print("AI Think: " + ai_think)
