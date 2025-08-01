@@ -8,6 +8,7 @@ import re
 import config
 from util_web_scrap import PubMed
 from util_chroma_db import ChromaDb
+from util_doc_generator import DocumentGenerator
 # LLM Library
 from langchain_ollama import OllamaLLM
 # MSSQL Library
@@ -27,6 +28,8 @@ class RAG:
         self.pubMed = PubMed()
         # Chroma to get context
         self.chromaDb = ChromaDb()
+        # Document Generator
+        self.docGenerator = DocumentGenerator(model_name=model_name)
 
 
     def generate_ollama_response(self, query, isChroma=False, collection_name="", chromaContext="", isWebScrape=False):
@@ -35,13 +38,13 @@ class RAG:
             chromaContext = self.chromaDb.get_context_from_collection(collection_name=collection_name, query=query)
         # Web Scrap Init
         webScrapArticle = ""
-        webScrapContext = ""
+        # webScrapContext = ""
         webScrapReference = []
         if isWebScrape:
             webScrapArticle = self.pubMed.search_pubmed(query=query)
             for i, article in enumerate(webScrapArticle):
-                webScrapContext += f"Article {i+1}: {article['title']}\nAbstract: {article.get('abstract', 'N/A')}\n\n"
-                webScrapReference.append(f"[{i+1}] {article['title']} - {article['url']}")
+                # webScrapContext += f"Article {i+1}: {article['title']}\nAbstract: {article.get('abstract', 'N/A')}\n\n"
+                webScrapReference.append(f"[{i+1}] {article['title']} - {article['url']}\n\n")
         # AI response generation start
         start_time = datetime.now()
         logging.warning("Generate AI Response (via RAG) Start Time")
@@ -62,7 +65,7 @@ class RAG:
         response = ollama_llm(prompt)
         # If doing web scrap, append AI response with references received
         if isWebScrape:
-            response = f"{response}\n\nReferences:\n" + "\n".join(webScrapReference)
+            response = f"{response}\n\nReferences:\n\n" + "\n".join(webScrapReference)
         end_time = datetime.now()
         logging.warning("Generate AI Response (via RAG) End")
 
@@ -80,7 +83,13 @@ class RAG:
             tag=sourceFileName,
             process_time_second=time_spent_second
         )
-        return ai_response, ai_think
+
+        # Generate document if AI thinks that user is asking for template/document generation
+        document_file_path = ""
+        isDocRequest = self.docGenerator.queryIntepreterDocGeneration(user_query=query)
+        if isDocRequest:
+            document_file_path = self.docGenerator.txtToDoc(ai_response=ai_response)
+        return ai_response, ai_think, isDocRequest, document_file_path
     
     def get_sql_connection(self, server, database, username=None, password=None):
         conn_str = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={database};UID={username};PWD={password};'

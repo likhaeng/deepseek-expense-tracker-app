@@ -6,3 +6,4 @@ selfsigncert.pem
 document_store/
 log/
 cache/
+web/__pycache__/

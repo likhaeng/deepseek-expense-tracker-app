@@ -73,6 +73,9 @@ model_list                      = config_json.get('SUPPORTED_AI_MODEL')
 search_mode_and_collection_map  = config_json.get('SEARCH_MODE_AND_COLLECTION_MAP')
 search_mode_list                = config_json.get('SEARCH_MODE_AND_COLLECTION_MAP').keys()
 
+# MD Doc Generator Config (ini)
+md_doc_folder   = os.path.join(BASE_DIR, *config['DOC_GENERATOR']['md_doc_folder'].split("|"))
+
 # config.ini Update Function
 def update_config(section, key, value):
     config = ConfigParser()
